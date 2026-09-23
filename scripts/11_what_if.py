@@ -41,7 +41,7 @@ warnings.filterwarnings("ignore")
 # ---- settings: change these ----
 YEAR = 2026
 RACE = "Spanish"
-DRIVER = "VER"
+DRIVER = "NOR"
 MAX_STOPS = 3
 # --------------------------------
 
@@ -205,7 +205,8 @@ for i, stops in enumerate(range(1, MAX_STOPS + 1)):
 # where they actually were
 ax_curve.scatter([actual_stops[0] if actual_stops else 0], [actual_cost],
                  s=90, color=INK, zorder=5, edgecolor=SURFACE, linewidth=2)
-ax_curve.annotate(f"what {DRIVER} did: {len(actual_stops)} stops, {actual_cost:.0f}s",
+ax_curve.annotate(f"what {DRIVER} did: {len(actual_stops)} stop"
+                  f"{'s' if len(actual_stops) != 1 else ''}, {actual_cost:.0f}s",
                   (actual_stops[0], actual_cost),
                   textcoords="offset points", xytext=(14, 26),
                   fontsize=10, color=INK, fontweight="bold",

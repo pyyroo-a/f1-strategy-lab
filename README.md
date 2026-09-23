@@ -458,34 +458,48 @@ each option would have been worth.
 It uses the REAL safety cars from that race, not random ones like step 9, so
 the alternatives get judged in the same conditions the driver actually had.
 
-**Example: Norris, Hungary 2026.**
+**Example: Norris, Spain 2026.**
 
 ```
-safety car on laps: [54, 55, 56, 57]
-he stopped on laps: [17, 39, 56]        model says 107.3s
+safety car on laps: [13, 14, 15]
+he stopped on lap:  [15]                model says 24.2s
 
-best 1 stop: [36]          126.9s     -19.5s
-best 2 stop: [27, 54]      104.6s      +2.7s
-best 3 stop: [18, 36, 54]  106.1s      +1.2s
+best 1 stop: [15]           24.2s      +0.0s
+best 2 stop: [13, 15]       37.4s     -13.1s
+best 3 stop: [14, 28, 44]   71.1s     -46.9s
 ```
 
-Two things worth noticing.
+**The model says he ran the single best strategy available.** Not a good one, the
+best one. Out of every combination it tried, nothing beat what he actually did.
 
-**He took the safety car stop.** His last stop was lap 56, right in the safety
-car window, which is the cheap one.
+He finished 3rd, 0.7 seconds behind Verstappen.
 
-**The model found the same trick on its own.** Every one of its best
-alternatives also stops on lap 54, inside that window. Nobody told it the
-safety car mattered, it just costs stops properly and the answer falls out.
+![what if chart](outputs/11_2026_Spanish_NOR_whatif.png)
 
-And the gap between his real strategy and the best alternative was 2.7 seconds,
-which is nothing. He basically nailed it, and he won the race, so there was
-nobody to gain on anyway.
+You can see it on the chart. The dip in all three lines around laps 13 to 15 is
+the safety car, where a stop is half price. Norris is the black dot, sitting
+right at the bottom of it.
 
-![what if chart](outputs/11_2026_Hungarian_NOR_whatif.png)
+**So why did he lose the position?** Not the strategy. The stop itself:
 
-The wobbles in those lines around laps 45 to 57 are the safety car. Stop in that
-window and the stop is half price, so the curve dips.
+```
+driver  lap  time in the pit lane
+NOR      15        35.0        <- P3
+ANT      14        31.8        <- P1
+VER      14        31.1        <- P2
+median    -        31.6
+```
+
+He was **3.2 seconds slower than his teammate in the pit lane**, and lost P2 by
+0.7. That one stop was the whole race.
+
+**And the tool cant see any of it**, because it charges everyone the circuit's
+typical pit loss. Perfect strategy, ruined in the pit box, and the model says
+everything was fine.
+
+Thats the clearest example of what step 10 measured. Fixing it is next: use each
+driver's real stop times instead of the circuit average.
+
 
 ## What didn't work
 
