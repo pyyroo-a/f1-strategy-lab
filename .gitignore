@@ -1,0 +1,17 @@
+# FastF1 downloads race data here. It's large and can always be re-downloaded,
+# so it should never go into git.
+cache/
+
+# Generated charts. ignored because they can always be remade,
+# except the ones the README actually shows
+outputs/*.png
+!outputs/11_2026_Hungarian_NOR_whatif.png
+
+# VS Code Code Runner leaves this lying around
+tempCodeRunnerFile.py
+
+__pycache__/
+*.pyc
+.venv/
+venv/
+.DS_Store
