@@ -33,6 +33,7 @@ from pathlib import Path
 
 import fastf1
 import matplotlib.pyplot as plt
+import pandas as pd
 
 from strategy import load_circuits, even_pit_laps, time_lost_real
 
@@ -83,14 +84,64 @@ red_laps = {int(n) for n in laps.loc[laps.ts.str.contains("5"), "LapNumber"]}
 mine = laps[laps["Driver"] == DRIVER].sort_values("LapNumber")
 actual_stops = sorted({int(n) for n in mine.loc[mine["PitInTime"].notna(), "LapNumber"]})
 
+
+# ---------------------------------------------------------------------------
+# how good were their stops, not just their plan?
+# ---------------------------------------------------------------------------
+# up to now every stop got charged the circuit's typical pit loss, so a driver
+# who had a disaster in the pit box looked identical to one who didnt.
+#
+# the pit lane time (crossing the entry line to crossing the exit line) is in
+# the data for every stop, so we can compare each driver's stop to the typical
+# stop at that race:
+#
+#     extra = their pit lane time - the typical pit lane time here
+#
+# positive means the crew were slower than normal, and thats a loss that has
+# nothing to do with strategy
+
+def lane_times(driver_laps):
+    """(lap, seconds in the pit lane) for every stop this driver made."""
+    out = []
+    driver_laps = driver_laps.sort_values("LapNumber")
+    for _, in_lap in driver_laps[driver_laps["PitInTime"].notna()].iterrows():
+        nxt = driver_laps[driver_laps["LapNumber"] == in_lap["LapNumber"] + 1]
+        if nxt.empty or pd.isna(nxt.iloc[0]["PitOutTime"]):
+            continue
+        out.append((int(in_lap["LapNumber"]),
+                    (nxt.iloc[0]["PitOutTime"] - in_lap["PitInTime"]).total_seconds()))
+    return out
+
+
+every_stop = []
+for _, dl in laps.groupby("Driver"):
+    every_stop += [secs for _, secs in lane_times(dl)]
+
+typical_lane = float(pd.Series(every_stop).median()) if every_stop else 0.0
+my_stops = lane_times(mine)
+slow_stop_cost = sum(secs - typical_lane for _, secs in my_stops)
+
 print(f"{DRIVER} at the {RACE} GP {YEAR}, {total_laps} laps")
 print(f"  deg {deg:.3f} s/lap, pit loss {pit_loss:.1f}s")
 print(f"  safety car on laps: {sorted(sc_laps) if sc_laps else 'none'}")
 print(f"  they actually stopped on laps: {actual_stops}")
 
-actual_cost = time_lost_real(deg, pit_loss, total_laps, set(actual_stops),
-                             sc_laps, red_laps)
-print(f"  which the model says cost {actual_cost:.1f}s\n")
+# the plan on its own, assuming a normal stop every time
+plan_cost = time_lost_real(deg, pit_loss, total_laps, set(actual_stops),
+                           sc_laps, red_laps)
+
+# and what their stops really cost on top of that
+actual_cost = plan_cost + slow_stop_cost
+
+print()
+print(f"  typical stop here takes {typical_lane:.1f}s in the pit lane")
+for lap, secs in my_stops:
+    print(f"    lap {lap:>2}: {secs:>5.1f}s   {secs - typical_lane:+.1f}s vs typical")
+print()
+print(f"  their plan cost        {plan_cost:>7.1f}s")
+print(f"  their stops cost       {slow_stop_cost:>+7.1f}s")
+print(f"  total                  {actual_cost:>7.1f}s")
+print()
 
 
 def cost(pit_laps):
@@ -122,18 +173,33 @@ for stops in range(1, MAX_STOPS + 1):
             best = (c, list(plan))
 
     best_per_stops[stops] = best
-    gain = actual_cost - best[0]
+    # compare against their PLAN, not their total. a different plan wouldnt
+    # have had the same slow stop, thats a separate problem
+    gain = plan_cost - best[0]
     print(f"  best {stops} stop: {str(best[1]):<22} {best[0]:>7.1f}s   "
           f"{gain:+.1f}s vs what they did")
 
 best_cost, best_plan = min(best_per_stops.values())
-gain = actual_cost - best_cost
+plan_gain = plan_cost - best_cost
 
 print()
-if gain <= 0.5:
-    print(f"They basically nailed it. Nothing was worth more than {gain:.1f}s.")
+if plan_gain <= 0.5:
+    print(f"THE PLAN: they basically nailed it, nothing beat it by more than "
+          f"{plan_gain:.1f}s.")
 else:
-    print(f"Best option was {best_plan}, worth {gain:.1f}s more than what they ran.")
+    print(f"THE PLAN: {best_plan} was worth {plan_gain:.1f}s more than what they ran.")
+
+if slow_stop_cost > 1:
+    print(f"THE STOPS: they lost {slow_stop_cost:.1f}s in the pit box compared to "
+          f"a normal stop here.")
+elif slow_stop_cost < -1:
+    print(f"THE STOPS: the crew gained them {abs(slow_stop_cost):.1f}s, "
+          f"their stops were quicker than normal.")
+else:
+    print("THE STOPS: normal, nothing gained or lost.")
+
+# everything they could have had: a better plan AND a normal stop
+gain = plan_gain + max(slow_stop_cost, 0.0)
 
 
 # ---------------------------------------------------------------------------

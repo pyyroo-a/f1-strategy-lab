@@ -493,12 +493,27 @@ median    -        31.6
 He was **3.2 seconds slower than his teammate in the pit lane**, and lost P2 by
 0.7. That one stop was the whole race.
 
-**And the tool cant see any of it**, because it charges everyone the circuit's
-typical pit loss. Perfect strategy, ruined in the pit box, and the model says
-everything was fine.
+**So the tool now splits a race into two separate questions.** Was the plan good,
+and was the stop good? They are different problems and they have different
+people to blame.
 
-Thats the clearest example of what step 10 measured. Fixing it is next: use each
-driver's real stop times instead of the circuit average.
+```
+their plan cost           24.2s
+their stops cost          +3.4s
+total                     27.7s
+
+THE PLAN:  they basically nailed it, nothing beat it by more than 0.0s
+THE STOPS: they lost 3.4s in the pit box compared to a normal stop here
+
+3.4s would have got them past: VER, so 1 position better
+```
+
+It works out the stop bit by comparing each driver's time in the pit lane
+against the typical stop at that race, so a slow wheel gun shows up as a cost
+instead of being averaged away.
+
+Which means the tool reaches the same conclusion anyone watching the race
+would: **the strategy was perfect and the pit crew lost him second place.**
 
 
 ## What didn't work
