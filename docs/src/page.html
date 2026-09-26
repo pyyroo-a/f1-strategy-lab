@@ -1,0 +1,102 @@
+<title>F1 Strategy Lab</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@600;700&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+
+<style>
+/*__CSS__*/
+</style>
+
+<div class="wrap">
+
+  <header>
+    <p class="eyebrow">2026 season &middot; measured from timing data</p>
+    <h1>F1 Strategy Lab</h1>
+    <p class="lede">
+      Pick any driver from any race and see what their strategy cost, what the
+      best alternative would have been, and whether it would have changed where
+      they finished. Every number here is measured from lap times, not guessed.
+    </p>
+  </header>
+
+  <div class="controls">
+    <div class="field">
+      <label for="race">Race</label>
+      <select id="race"></select>
+    </div>
+    <div class="field">
+      <label for="driver">Driver</label>
+      <select id="driver"></select>
+    </div>
+  </div>
+
+  <section class="verdicts" id="verdicts"></section>
+
+  <section class="split">
+    <figure class="panel">
+      <div class="panel-head">
+        <h2 id="chart-title">When to stop</h2>
+        <span class="eyebrow">time lost vs lap of first stop</span>
+      </div>
+      <div class="chart-wrap">
+        <svg id="chart" viewBox="0 0 640 360" role="img" aria-label="Time lost against the lap of the first pit stop"></svg>
+      </div>
+      <div class="readout" id="readout"></div>
+    </figure>
+
+    <div style="display:flex; flex-direction:column; gap:20px;">
+      <div class="panel">
+        <div class="panel-head"><h2>Where the time went</h2></div>
+        <div class="rows" id="breakdown"></div>
+      </div>
+      <div class="panel">
+        <div class="panel-head"><h2>This circuit</h2></div>
+        <div class="facts" id="facts"></div>
+        <p class="note flag" id="borrowed" hidden></p>
+      </div>
+    </div>
+  </section>
+
+  <section class="panel">
+    <div class="panel-head">
+      <h2>The season, measured</h2>
+      <span class="eyebrow">the three things this project measures</span>
+    </div>
+    <div class="tables">
+      <div>
+        <h3>Tyre wear</h3>
+        <p class="note">Seconds lost per lap of tyre age, in clean air.</p>
+        <div class="scroll"><table id="t-deg"></table></div>
+      </div>
+      <div>
+        <h3>Cost of a pit stop</h3>
+        <p class="note">Measured from the laps a stop wrecks. Borrowed where too few green flag stops survived.</p>
+        <div class="scroll"><table id="t-pit"></table></div>
+      </div>
+      <div>
+        <h3>How hard to overtake</h3>
+        <p class="note">Laps you stay stuck once you are within 1.5s of the car ahead.</p>
+        <div class="scroll"><table id="t-ot"></table></div>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    <p><strong>What this can and cannot do.</strong> It ranks strategies well and
+    picks the right number of stops at most circuits. It cannot tell you a gap in
+    seconds reliably, and it cannot tell soft tyres from hard ones, because the
+    noise between two identical stints is ten times bigger than the difference.</p>
+    <ul>
+      <li>Alternatives assume everyone else does exactly what they really did.</li>
+      <li>The model knows a safety car happened. The driver did not.</li>
+      <li>Canada is missing: its measured tyre wear is negative, which is impossible.</li>
+      <li>No wet races, and no tyre temperatures or pressures, which are not public.</li>
+    </ul>
+    <p style="margin-top:12px">Built with <a href="https://github.com/theOehrly/Fast-F1">FastF1</a>.
+    Method and code: <a href="https://github.com/pyyroo-a/f1-strategy-lab">github.com/pyyroo-a/f1-strategy-lab</a></p>
+  </footer>
+
+</div>
+
+<script id="site-data" type="application/json">/*__DATA__*/</script>
+<script>
+/*__JS__*/
+</script>

@@ -16,3 +16,6 @@ __pycache__/
 .venv/
 venv/
 .DS_Store
+
+# the website data is baked into docs/index.html, no need to track it twice
+docs/data.json

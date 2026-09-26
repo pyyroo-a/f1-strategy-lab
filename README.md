@@ -841,7 +841,29 @@ Run them in order, each one saves what the next one needs.
 | `scripts/10_validation.py` | Checks the model against real teammate battles |
 | `scripts/11_what_if.py` | What could a driver have done instead, with charts |
 | `scripts/12_overtaking.py` | Measures how hard each track is to overtake at |
+| `scripts/build_website.py` | Runs the analysis for every driver and builds the website |
 | `scripts/strategy.py` | Shared bits used by more than one script |
+
+## The website
+
+`docs/index.html` is a page where you pick a race and a driver and get the what
+if analysis, with charts. No backend, everything is worked out ahead of time and
+baked into the file.
+
+The source is split up so its easy to work on:
+
+```
+docs/src/page.html    the markup
+docs/src/styles.css   the styling
+docs/src/app.js       the pickers, the chart, the tables
+docs/index.html       all of the above plus the data, glued together
+```
+
+Rebuild it after a new race with:
+
+```bash
+python scripts/build_website.py
+```
 
 ## Running
 
