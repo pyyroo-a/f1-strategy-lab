@@ -1,6 +1,8 @@
 # F1 Strategy Lab
 
-**[Try it →](https://vashen.me/f1-strategy-lab/)**
+**[Try it → vashen.me/f1-strategy-lab](https://vashen.me/f1-strategy-lab/)**
+Pick any driver from any 2026 race and see what their pit strategy cost, what
+the best alternative was, and whether it would have changed where they finished.
 
 Working out how fast F1 tyres wear out in the 2026 season, and using that to
 figure out **what strategy a driver should have run.**
