@@ -1,5 +1,7 @@
 # F1 Strategy Lab
 
+**[Try it →](https://pyyroo-a.github.io/f1-strategy-lab/)**
+
 Working out how fast F1 tyres wear out in the 2026 season, and using that to
 figure out **what strategy a driver should have run.**
 
