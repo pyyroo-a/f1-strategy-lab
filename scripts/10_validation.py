@@ -68,7 +68,8 @@ import fastf1
 import numpy as np
 import pandas as pd
 
-from strategy import load_circuits, real_pit_stops
+from strategy import (load_circuits, real_pit_stops, load_overtaking,
+                      field_times, traffic_cost)
 
 warnings.filterwarnings("ignore")
 
@@ -229,6 +230,10 @@ for race in trusted.index:
     pace = driver_pace(clean)
     clean_laps_each = clean["Driver"].value_counts().to_dict()
 
+    # for the traffic estimate (step 12)
+    laps_stuck = load_overtaking(race)
+    field_time = field_times(laps)
+
     results = session.results.set_index("Abbreviation")
 
     info = {}
@@ -245,10 +250,17 @@ for race in trusted.index:
         if lap1.empty or pd.isna(lap1.iloc[0]["Time"]):
             continue
 
+        stops_here = set(real_pit_stops(dl))
+
         info[driver] = {
             "team": results.loc[driver, "TeamName"] if driver in results.index else None,
             # only laps where the tyre really changed, see real_pit_stops
-            "pit_laps": set(real_pit_stops(dl)),
+            "pit_laps": stops_here,
+            # what traffic cost them, using their own real plan as the
+            # reference so this is an estimate of what really happened
+            "traffic": traffic_cost(driver, stops_here, deg, pit_loss,
+                                    total_laps, sc_laps, red_laps, field_time,
+                                    stops_here, laps_stuck),
             "pace": pace[driver],
             "n_clean": clean_laps_each.get(driver, 0),
             # Time is the moment they crossed the line, so the last one is when
@@ -276,6 +288,9 @@ for race in trusted.index:
             # v1: strategy only. positive means the model thinks A ends up behind B
             strategy_gap = pred_a - pred_b
 
+            # v3: what traffic did to each of them on top
+            traffic_gap = info[a]["traffic"] - info[b]["traffic"]
+
             # v2: strategy plus how much slower A was per lap.
             # we measure the gap from the end of lap 1, so the pace applies to
             # the remaining laps, not all of them
@@ -297,12 +312,14 @@ for race in trusted.index:
                 "stops_b": len(info[b]["pit_laps"]),
                 "strategy_gap": strategy_gap,
                 "pace_gap": pace_gap,
+                "traffic_gap": traffic_gap,
                 "n_clean_a": info[a]["n_clean"],
                 "n_clean_b": info[b]["n_clean"],
                 "predicted_gap": strategy_gap + pace_gap,
                 "actual_gap": actual_gap,
                 "error_v1": strategy_gap - actual_gap,
                 "error_v2": strategy_gap + pace_gap - actual_gap,
+                "error_v3": strategy_gap + pace_gap + traffic_gap - actual_gap,
             })
             pairs += 1
 
@@ -342,9 +359,13 @@ def report(name, err):
 report("say nothing", baseline)
 report("v1 strategy only", val["error_v1"])
 report("v2 strategy + pace", val["error_v2"])
+report("v3 + traffic", val["error_v3"])
 
 print()
-for name, col in [("v1", "strategy_gap"), ("v2", "predicted_gap")]:
+val["predicted_v3"] = val["predicted_gap"] + val["traffic_gap"]
+
+for name, col in [("v1", "strategy_gap"), ("v2", "predicted_gap"),
+                  ("v3", "predicted_v3")]:
     right = ((val[col] > 0) == (val["actual_gap"] > 0)).sum()
     print(f"{name} gets the direction right {right}/{len(val)}, "
           f"correlation with reality {val[col].corr(val['actual_gap']):.2f}")

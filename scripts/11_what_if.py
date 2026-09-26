@@ -1,7 +1,7 @@
 """
 Step 11: The what if tool
 
-Take a driver's real race, try the strategies they could have run instead, and
+Take a drivers real race, try the strategies they could have run instead, and
 say what each one would have been worth.
 
 How it works
@@ -9,22 +9,37 @@ How it works
 1. Pull their REAL pit laps out of the data and run them through the model.
    That gives what the strategy they actually ran cost them.
 2. Try every alternative. One stop, two stops, three stops, at every lap.
-3. Best alternative minus what they actually did = the seconds they left on
-   the table.
-4. Turn those seconds into positions, using the real gaps to the cars around
-   them at the flag.
+3. Best alternative minus what they did = the seconds they left on the table.
+4. Turn those seconds into positions, using the real gaps around them.
 
-We use the REAL safety cars from that race, not random ones like step 9, so the
-alternative gets judged in the same conditions they actually had.
+I use the REAL safety cars from that race, not random ones like step 9, so the
+alternatives get judged in the same conditions the driver actually had.
 
-What this CANT do (from step 10)
---------------------------------
-The model has no idea other cars exist. In real life you pit, come out behind
-someone slower, and sit there losing time for six laps. None of that is in here.
+Two separate questions
+----------------------
+Watching the Spanish GP, Norris ran what looked like the same strategy as
+Antonelli and still came out behind. When I looked it up, his pit stop had taken
+about 3 seconds longer than his teammates, and he lost second place by 0.7.
 
-Step 10 measured exactly how bad that makes it: the model picks the better
-strategy about 8 times out of 10, but it cant tell you the gap in seconds
-reliably. So read the ORDER of these results, not the exact numbers.
+The tool couldnt see that, because it charged everyone the circuits typical pit
+loss. So a driver who had a disaster in the pit box looked identical to one who
+didnt.
+
+Now it splits a race into two questions that have different people to blame:
+
+    was the PLAN good?   was the STOP good?
+
+It works the second one out by comparing each drivers time in the pit lane
+against the typical stop at that race.
+
+What this still CANT do
+-----------------------
+Step 10 measured how wrong the model is: it picks the better strategy about 8
+times out of 10, but it cant tell you the gap in seconds reliably. So read the
+ORDER of these results, not the exact numbers.
+
+I thought traffic was the reason for that. Step 13 proved me wrong, its the pace
+estimate. Traffic is in here anyway because its real, just small.
 """
 
 import warnings
@@ -36,7 +51,8 @@ import matplotlib.pyplot as plt
 import pandas as pd
 
 from strategy import (load_circuits, even_pit_laps, time_lost_real,
-                      real_pit_stops)
+                      real_pit_stops, load_overtaking, field_times,
+                      traffic_cost as traffic_for)
 
 warnings.filterwarnings("ignore")
 
@@ -90,8 +106,9 @@ actual_stops = sorted(real_pit_stops(mine))
 # ---------------------------------------------------------------------------
 # how good were their stops, not just their plan?
 # ---------------------------------------------------------------------------
-# up to now every stop got charged the circuit's typical pit loss, so a driver
-# who had a disaster in the pit box looked identical to one who didnt.
+# up to now every stop got charged the circuits typical pit loss, so a driver
+# who had a disaster in the pit box looked identical to one who didnt. Norris at
+# Spain is the example: perfect strategy, 3.4s lost in the pit box, lost P2 by 0.7.
 #
 # the pit lane time (crossing the entry line to crossing the exit line) is in
 # the data for every stop, so we can compare each driver's stop to the typical
@@ -113,8 +130,16 @@ def lane_times(driver_laps):
         nxt = driver_laps[driver_laps["LapNumber"] == in_lap["LapNumber"] + 1]
         if nxt.empty or pd.isna(nxt.iloc[0]["PitOutTime"]):
             continue
-        out.append((int(in_lap["LapNumber"]),
-                    (nxt.iloc[0]["PitOutTime"] - in_lap["PitInTime"]).total_seconds()))
+
+        secs = (nxt.iloc[0]["PitOutTime"] - in_lap["PitInTime"]).total_seconds()
+
+        # under a red flag the cars just sit in the pit lane, so this timer keeps
+        # running for half an hour. I only noticed because Monaco came back
+        # saying drivers lost 2100 seconds in the pit box. those arent stops
+        if secs > 120:
+            continue
+
+        out.append((int(in_lap["LapNumber"]), secs))
     return out
 
 
@@ -131,9 +156,47 @@ print(f"  deg {deg:.3f} s/lap, pit loss {pit_loss:.1f}s")
 print(f"  safety car on laps: {sorted(sc_laps) if sc_laps else 'none'}")
 print(f"  they actually stopped on laps: {actual_stops}")
 
-# the plan on its own, assuming a normal stop every time
-plan_cost = time_lost_real(deg, pit_loss, total_laps, set(actual_stops),
+# ---------------------------------------------------------------------------
+# traffic: where do you come out, and how long are you stuck there?
+# ---------------------------------------------------------------------------
+# this is the thing step 10 said was wrecking our accuracy. the model had no
+# idea other cars existed, so pitting into the middle of a queue looked free.
+#
+# we know the real race, so we can work out exactly where an alternative stop
+# would have dropped them:
+#
+#   1. take their REAL time at each lap
+#   2. add on however much better or worse the alternative plan is up to there
+#   3. see whose real time that lands just behind
+#
+# then charge the dirty air cost we measured in step 6 for as many laps as
+# step 12 says you stay stuck at this circuit
+
+# how many laps you stay stuck here, measured in step 12
+laps_stuck = load_overtaking(RACE)
+
+# everyones real time at the end of each lap
+field_time = field_times(laps)
+
+
+def traffic_cost(pit_laps):
+    """What this plan would cost in traffic. See strategy.py for the details."""
+    return traffic_for(DRIVER, pit_laps, deg, pit_loss, total_laps, sc_laps,
+                       red_laps, field_time, actual_stops, laps_stuck)
+
+
+def cost(pit_laps):
+    """Everything a strategy costs: tyres, stops, and traffic."""
+    return (time_lost_real(deg, pit_loss, total_laps, set(pit_laps),
                            sc_laps, red_laps)
+            + traffic_cost(pit_laps))
+
+
+# the plan on its own, assuming a normal stop every time
+tyres_and_stops = time_lost_real(deg, pit_loss, total_laps, set(actual_stops),
+                                 sc_laps, red_laps)
+traffic = traffic_cost(actual_stops)
+plan_cost = tyres_and_stops + traffic
 
 # and what their stops really cost on top of that
 actual_cost = plan_cost + slow_stop_cost
@@ -143,14 +206,14 @@ print(f"  typical stop here takes {typical_lane:.1f}s in the pit lane")
 for lap, secs in my_stops:
     print(f"    lap {lap:>2}: {secs:>5.1f}s   {secs - typical_lane:+.1f}s vs typical")
 print()
+print(f"  stuck behind someone   {laps_stuck:.1f} laps on average here")
+print()
+print(f"  tyres and stops        {tyres_and_stops:>7.1f}s")
+print(f"  traffic                {traffic:>+7.1f}s")
 print(f"  their plan cost        {plan_cost:>7.1f}s")
 print(f"  their stops cost       {slow_stop_cost:>+7.1f}s")
 print(f"  total                  {actual_cost:>7.1f}s")
 print()
-
-
-def cost(pit_laps):
-    return time_lost_real(deg, pit_loss, total_laps, set(pit_laps), sc_laps, red_laps)
 
 
 # ---------------------------------------------------------------------------
