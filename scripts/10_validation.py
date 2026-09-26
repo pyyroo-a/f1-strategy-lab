@@ -68,7 +68,7 @@ import fastf1
 import numpy as np
 import pandas as pd
 
-from strategy import load_circuits
+from strategy import load_circuits, real_pit_stops
 
 warnings.filterwarnings("ignore")
 
@@ -247,7 +247,8 @@ for race in trusted.index:
 
         info[driver] = {
             "team": results.loc[driver, "TeamName"] if driver in results.index else None,
-            "pit_laps": {int(n) for n in dl.loc[dl["PitInTime"].notna(), "LapNumber"]},
+            # only laps where the tyre really changed, see real_pit_stops
+            "pit_laps": set(real_pit_stops(dl)),
             "pace": pace[driver],
             "n_clean": clean_laps_each.get(driver, 0),
             # Time is the moment they crossed the line, so the last one is when

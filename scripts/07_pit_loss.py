@@ -58,6 +58,8 @@ import fastf1
 import numpy as np
 import pandas as pd
 
+from strategy import real_pit_stops
+
 warnings.filterwarnings("ignore")
 
 # ---- settings ----
@@ -108,6 +110,7 @@ for _, event in races.iterrows():
     laps["LapTimeSec"] = laps["LapTime"].dt.total_seconds()
 
     kept = dropped_red = dropped_sc = dropped_yellow = dropped_notime = 0
+    dropped_nochange = 0
 
     for driver, dl in laps.groupby("Driver"):
         dl = dl.sort_values("LapNumber")
@@ -122,9 +125,16 @@ for _, event in races.iterrows():
             & (dl["LapNumber"] > 1)
         ]
 
-        # a pit stop shows up as a lap with a PitInTime on it
+        # a real stop is one where the tyre actually changed. going through the
+        # pit lane without stopping doesnt count, see real_pit_stops
+        changed_tyres = set(real_pit_stops(dl))
+
         for _, in_lap in dl[dl["PitInTime"].notna()].iterrows():
             n = in_lap["LapNumber"]
+
+            if int(n) not in changed_tyres:
+                dropped_nochange += 1
+                continue
 
             # the out lap is the next lap and it should have a PitOutTime
             nxt = dl[dl["LapNumber"] == n + 1]
@@ -205,7 +215,8 @@ for _, event in races.iterrows():
 
     print(f"  R{round_no:02d} {name:<12} {kept:3d} usable  "
           f"(dropped: {dropped_red} red flag, {dropped_sc} safety car, "
-          f"{dropped_yellow} yellow, {dropped_notime} no timing)")
+          f"{dropped_yellow} yellow, {dropped_notime} no timing, "
+          f"{dropped_nochange} no tyre change)")
 
 
 stops = pd.DataFrame(stops)

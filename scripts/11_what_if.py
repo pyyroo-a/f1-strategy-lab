@@ -35,7 +35,8 @@ import fastf1
 import matplotlib.pyplot as plt
 import pandas as pd
 
-from strategy import load_circuits, even_pit_laps, time_lost_real
+from strategy import (load_circuits, even_pit_laps, time_lost_real,
+                      real_pit_stops)
 
 warnings.filterwarnings("ignore")
 
@@ -82,7 +83,8 @@ sc_laps = {int(n) for n in laps.loc[laps.ts.str.contains("[467]"), "LapNumber"]}
 red_laps = {int(n) for n in laps.loc[laps.ts.str.contains("5"), "LapNumber"]}
 
 mine = laps[laps["Driver"] == DRIVER].sort_values("LapNumber")
-actual_stops = sorted({int(n) for n in mine.loc[mine["PitInTime"].notna(), "LapNumber"]})
+# only the laps where the tyre really changed, see real_pit_stops
+actual_stops = sorted(real_pit_stops(mine))
 
 
 # ---------------------------------------------------------------------------
@@ -104,7 +106,10 @@ def lane_times(driver_laps):
     """(lap, seconds in the pit lane) for every stop this driver made."""
     out = []
     driver_laps = driver_laps.sort_values("LapNumber")
+    changed_tyres = set(real_pit_stops(driver_laps))
     for _, in_lap in driver_laps[driver_laps["PitInTime"].notna()].iterrows():
+        if int(in_lap["LapNumber"]) not in changed_tyres:
+            continue
         nxt = driver_laps[driver_laps["LapNumber"] == in_lap["LapNumber"] + 1]
         if nxt.empty or pd.isna(nxt.iloc[0]["PitOutTime"]):
             continue

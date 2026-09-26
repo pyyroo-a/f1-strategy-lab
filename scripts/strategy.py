@@ -110,3 +110,41 @@ def time_lost_real(deg, pit_loss, total_laps, pit_laps, sc_laps, red_laps):
         age += 1
 
     return total
+
+
+def real_pit_stops(driver_laps):
+    """Which laps this driver ACTUALLY changed tyres on.
+
+    We used to count any lap with a PitInTime as a pit stop. Baku 2026 proved
+    that wrong. Albon crashed, and the whole field got sent through the pit
+    lane on lap 36 without stopping. FastF1 records that as a pit entry, so 15
+    of Baku's 36 "stops" never happened and it looked like a 2 stop race when
+    it was a 1 stop.
+
+    A real stop leaves a mark on the tyre. Either the compound is different
+    afterwards, or the tyre age resets to 1. Verstappen came out of that lap 36
+    trip on the same softs with the age still counting up (5, 6, 7), so it
+    fails both checks and gets dropped.
+
+    This also catches things like a driver serving a penalty in the pit lane.
+
+    (A stop on the very last lap gets missed because theres no next lap to
+    check, but nobody pits on the last lap.)
+    """
+    dl = driver_laps.sort_values("LapNumber")
+    stops = []
+
+    for _, in_lap in dl[dl["PitInTime"].notna()].iterrows():
+        nxt = dl[dl["LapNumber"] == in_lap["LapNumber"] + 1]
+        if nxt.empty:
+            continue
+
+        after = nxt.iloc[0]
+        changed = (
+            after["Compound"] != in_lap["Compound"]
+            or after["TyreLife"] < in_lap["TyreLife"]
+        )
+        if changed:
+            stops.append(int(in_lap["LapNumber"]))
+
+    return stops

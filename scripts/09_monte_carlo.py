@@ -13,22 +13,28 @@ which is why it kept saying fewer stops than the real teams did. A safety car
 makes a pit stop way cheaper because everyone else is crawling, so teams grab
 free tyres when one shows up.
 
-What we found at Barcelona
---------------------------
+What we found
+-------------
 1. Safety cars save you about 0.7s per stop, just from the chance that one of
    your planned stops happens to land while its out. More stops = more chances.
 
 2. Reacting to a safety car only helps if it comes CLOSE to when you were
-   going to stop anyway:
+   going to stop anyway. At Barcelona always pitting under a safety car is 12
+   seconds WORSE than never reacting, because pitting 15 laps early wrecks your
+   stint balance and one tyre ends up ancient. Thats why you sometimes see a
+   team leave a driver out under a safety car.
 
-       window 0  -> 140.82   basically ignore safety cars
-       window 4  -> 140.12   best
-       window 30 -> 153.02   always pit under safety car
+3. But that flips on low degradation tracks. At Spain a lap of tyre age only
+   costs 0.011s, so pitting early costs almost nothing while the safety car
+   still saves you 13 seconds. There the best move is to grab any safety car
+   going.
 
-   Always pitting under a safety car is 12 seconds WORSE than never reacting.
-   If you pit 15 laps early you save 12 seconds on the stop but wreck your
-   stint balance, and one of your tyres ends up ancient. Thats why you
-   sometimes see a team leave a driver out under a safety car.
+   So the rule isnt "react within 4 laps", its:
+       high deg track -> be picky
+       low deg track  -> take anything
+
+Nothing here is hand picked. We search every window and keep adding stops until
+it stops helping.
 """
 
 import random
@@ -46,9 +52,14 @@ SC_LENGTH_LAPS = 7
 # a stop under the safety car costs about half as much.
 # this one is an assumption, not measured, so worth testing later
 SC_PIT_LOSS_FACTOR = 0.5
+# ---------------------------------------
+
+RUNS = 2000      # how many simulated races per strategy
+SEED = 1         # fixed seed so we get the same answer every time we run it
+
 
 def make_safety_cars(total_laps):
-    """Roll the dice for the whole race and give back which laps had a SC out."""
+    """Roll the dice for one race and give back which laps had a SC out."""
     sc_laps = set()
 
     for lap in range(1, total_laps+1):
@@ -61,11 +72,27 @@ def make_safety_cars(total_laps):
     return sc_laps
 
 
+def make_scenarios(total_laps, runs=RUNS):
+    """Roll ALL the races up front, once, and reuse them for every strategy.
+
+    This is a trick called common random numbers. If every strategy gets fresh
+    dice then one of them can just get lucky, and with 2000 runs the luck is
+    about the same size as the differences we are looking for.
+
+    Rolling the scenarios once and testing every strategy against the exact
+    same 2000 races means the luck is identical for all of them, so any
+    difference has to be the strategy. Same idea as comparing teammates instead
+    of comparing different teams.
+    """
+    random.seed(SEED)
+    return [make_safety_cars(total_laps) for _ in range(runs)]
+
+
 # we define this function so that we dont always pit during a SC because a real strategist wont
 # we pit when it is close to the originallly intended pitting window
-
+#
 # react_window = how many laps EARLY we are willing to pit if a SC shows up.
-# 0 means dont react at all, 30 means grab any safety car going.
+# 0 means dont react at all, race_laps means grab any safety car going.
 def time_lost_reaction(deg, pit_loss, total_laps, pit_laps, sc_laps, react_window):
     age = 0
     total = 0
@@ -97,30 +124,41 @@ def time_lost_reaction(deg, pit_loss, total_laps, pit_laps, sc_laps, react_windo
     return total
 
 
-def average_reacting(deg, pit_loss, total_laps, pit_laps, react_window, runs=10000):
-    """Simulate the same strategy thousands of times and average it.
-
-    One race tells us nothing because it all depends on whether the dice gave
-    us a safety car. Thousands of races tells us what usually happens.
-    """
+def average_reacting(deg, pit_loss, total_laps, pit_laps, react_window, scenarios):
+    """Run one strategy against every scenario and average the time lost."""
     total = 0
 
-    for i in range(runs): # simulating 10000 times
-        # fresh safety cars every run, thats the whole point
-        sc_laps = make_safety_cars(total_laps)
+    for sc_laps in scenarios:
         total = total + time_lost_reaction(
             deg, pit_loss, total_laps, pit_laps, sc_laps, react_window
         )
 
-    return total / runs
+    return total / len(scenarios)
+
+
+def best_window(deg, pit_loss, total_laps, plan, scenarios):
+    """Try EVERY reaction window and give back the best one.
+
+    No hand picked list. The window only matters up to the first planned stop,
+    because past that you would be reacting before the race even starts, so
+    thats where we stop looking.
+    """
+    best = None
+
+    for window in range(0, plan[0] + 1):
+        result = average_reacting(deg, pit_loss, total_laps, plan, window, scenarios)
+
+        if best is None or result < best[0]:
+            best = (result, window)
+
+    return best
+
 
 # ---------------------------------------------------------------------------
 # try it on whichever circuit you want
 # ---------------------------------------------------------------------------
 
-RACE = "Monaco"          # change this: Spanish, Italian, Monaco, Hungarian...
-WINDOWS = [0, 2, 4, 8, 15, 30]
-MAX_STOPS = 4
+RACE = "Barcelona"          # change this: Spanish, Italian, Monaco, Hungarian...
 
 circuits = load_circuits()
 row = circuits.loc[RACE]
@@ -137,26 +175,35 @@ if not row["trusted"]:
     print(f"WARNING: only {int(row['stops'])} green flag stops here, "
           f"so the pit loss is a guess. Dont trust the numbers below.")
 
-print()
-print("rows = number of stops, columns = how many laps early we react to a safety car")
-print()
-print("stops  " + "".join(f"{w:>9}" for w in WINDOWS))
+scenarios = make_scenarios(race_laps)
+print(f"{len(scenarios)} simulated races, same ones used for every strategy\n")
 
-best = None
+print("stops   plan                  best window   time lost")
 
-for stops in range(1, MAX_STOPS + 1):
+overall = None
+previous = None
+stops = 1
+
+# keep adding stops until it stops helping.
+# the curve only bends one way (down, bottom, up) so the first time it gets
+# worse we are past the best and can stop looking
+while True:
     plan = even_pit_laps(race_laps, stops)
+    result, window = best_window(deg, pit_loss, race_laps, plan, scenarios)
 
-    print(f"{stops:>5}  ", end="")
-    for window in WINDOWS:
-        result = average_reacting(deg, pit_loss, race_laps, plan, window)
-        print(f"{result:>9.2f}", end="")
+    print(f"{stops:>5}   {str(plan):<20}  {window:>11}   {result:>9.2f}")
 
-        if best is None or result < best[0]:
-            best = (result, stops, window, plan)
+    if previous is not None and result > previous:
+        print(f"\n{stops} stops is worse than {stops - 1}, so we stop looking")
+        break
 
-    print()
+    if overall is None or result < overall[0]:
+        overall = (result, stops, window, plan)
+
+    previous = result
+    stops += 1
 
 print()
-print(f"best: {best[1]} stops at {best[3]}, reacting within {best[2]} laps, "
-      f"losing {best[0]:.2f}s")
+print(f"best: {overall[1]} stops at {overall[3]}, "
+      f"reacting to a safety car up to {overall[2]} laps early, "
+      f"losing {overall[0]:.2f}s")

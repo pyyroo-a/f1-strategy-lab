@@ -38,14 +38,14 @@ gets blamed on the tyre.
 ## Where it's at
 
 - **Degradation per circuit:** working
-- **Pit loss per circuit:** working (12 of 14 circuits)
+- **Pit loss per circuit:** working (12 of 15 circuits)
 - **Simulator:** working, picks the best number of stops for each circuit
 - **Degradation per compound (soft vs hard):** tried it, the data can't do it. Explained below
 - **Monte Carlo (safety cars):** working
 - **Validation:** done, and the honest answer is mixed. See step 10
 - **What if tool:** working, with charts
 
-All results below are from the first 14 rounds of 2026 (up to Spain).
+All results below are from the first 15 rounds of 2026 (up to Azerbaijan).
 
 ## Results
 
@@ -66,8 +66,9 @@ Seconds lost per lap of tyre age, clean air only:
 | China | 0.027 | |
 | Monaco | 0.024 | really slow, hardly any load on the tyres |
 | Miami | 0.022 | |
-| Italy | 0.013 | Monza is basically all straights, gentlest track of the season |
+| Italy | 0.013 | Monza is basically all straights |
 | Spain | 0.011 | barely wears the tyres at all |
+| Azerbaijan | 0.005 | gentlest of the whole season. Baku is mostly straight lines |
 | Canada | **-0.017** | **impossible, still weird and we don't know why yet** |
 
 How to read it: at Barcelona a tyre that's 20 laps old is about **2.8 seconds
@@ -82,22 +83,23 @@ and Monza is the gentlest, which is exactly what anyone in F1 would tell you.
 
 | Circuit | Pit loss (s) | Spread | Stops used |
 | --- | --- | --- | --- |
-| Canada | 27.8 | 7.2 | 14 |
+| Canada | 27.8 | 7.4 | 13 |
 | Spain | 26.8 | 2.3 | 14 |
-| Australia | 24.5 | 7.7 | 9 |
 | Barcelona | 23.8 | 1.8 | 40 |
-| Japan | 22.9 | 2.5 | 13 |
-| Hungary | 22.1 | 1.9 | 34 |
-| Monaco | 21.9 | 3.5 | 19 |
-| Britain | 21.5 | 5.2 | 22 |
+| Australia | 23.6 | 8.1 | 8 |
+| Monaco | 22.4 | 2.0 | 17 |
+| Japan | 22.4 | 1.7 | 10 |
+| Hungary | 22.0 | 2.0 | 33 |
 | Austria | 21.4 | 1.2 | 33 |
+| Britain | 21.3 | 5.2 | 21 |
 | Belgium | 20.8 | 4.5 | 9 |
-| Miami | 19.5 | 1.6 | 19 |
-| Netherlands | 19.4 | 2.1 | 37 |
+| Miami | 19.6 | 1.3 | 18 |
+| Netherlands | 19.4 | 2.1 | 36 |
 | China | not trusted | | only 4 |
 | Italy | not trusted | | only 2 |
+| Azerbaijan | not trusted | | only 2 |
 
-Typical pit loss is **22.0 seconds**, which is right where real F1 pit loss
+Typical pit loss is **21.9 seconds**, which is right where real F1 pit loss
 sits (roughly 16 to 30 depending on the track).
 
 Spread is how much the drivers disagree with each other. At Barcelona 40 stops
@@ -376,8 +378,35 @@ Pit 15 laps early and you save 12s on the stop but wreck your stint balance, so
 one tyre ends up ancient. Thats why you sometimes see a team leave a driver out
 under a safety car while everyone at home screams at the telly.
 
-The whole thing runs 30,000 simulated races in 0.43 seconds, so we never needed
-numpy for it. Good thing we measured before optimising.
+**Nothing in here is hand picked.** It tries every reaction window from 0 up to
+the first planned stop, and keeps adding pit stops until they stop helping. Our
+first version used a list of windows I had just chosen, which meant the answer
+could only ever be the best of six numbers I happened to pick.
+
+To make a fine search work we needed one more trick, called **common random
+numbers**. Roll 2000 safety car scenarios ONCE, then test every strategy
+against those exact same 2000 races. Otherwise one option can just get lucky
+dice, and with windows 4 and 5 differing by less than the luck does, the search
+would pick whichever got the nicer roll. Same logic as comparing teammates
+instead of comparing different teams.
+
+It also means far fewer runs are needed, so the whole fine search takes about 5
+seconds. We never needed numpy for any of it. Good thing we measured before
+optimising.
+
+**And the best window changes completely by circuit:**
+
+```
+Barcelona   deg 0.139   ->  3 stops, window 4     be picky
+Monaco      deg 0.024   ->  1 stop,  window 14
+Spain       deg 0.011   ->  1 stop,  window 22    take anything
+```
+
+The lower the degradation, the wider the window. It makes sense once you see
+it: the cost of pitting early is unbalanced stints, and that cost is made of
+degradation. At Barcelona pitting 15 laps early is a disaster. At Spain a lap
+of tyre age costs 0.011s, so pitting early costs almost nothing while the
+safety car still saves you 13 seconds.
 
 ### Step 10: validation, how wrong is it?
 
@@ -515,6 +544,55 @@ instead of being averaged away.
 Which means the tool reaches the same conclusion anyone watching the race
 would: **the strategy was perfect and the pit crew lost him second place.**
 
+
+### Step 12: a pit stop that never happened
+
+Baku 2026 broke something, and it was worth breaking.
+
+Watching the race it was obviously a **one stop**. Albon crashed, the safety car
+came out, and the whole field dived in at once. But the data said most drivers
+stopped **twice**, on lap 30 and again on lap 36, with a 5 lap stint in between.
+Several of them apparently went soft to soft. Nobody does that.
+
+Verstappen shows what really happened:
+
+```
+lap  compound  TyreLife  FreshTyre  pit
+30   MEDIUM       30       True
+31   MEDIUM       31       True      IN     <- real stop
+32   SOFT          1       True      OUT    <- new tyres
+...
+36   SOFT          5       True      IN     <- "stop"
+37   SOFT          6       False     OUT    <- SAME tyres, age keeps counting
+```
+
+The lap 36 trip put him back out on the same tyres with the age still counting
+up. The field had been **sent through the pit lane** because the crash blocked
+the track, and FastF1 records that as a pit entry.
+
+**15 of Baku's 36 recorded stops never happened.**
+
+So we stopped counting pit entries and started counting **tyre changes**. A stop
+only counts if the compound is different afterwards, or the tyre age resets.
+
+It cleaned up races we thought were fine:
+
+```
+             stops before   after   spread before   after
+Monaco            61          17         3.5         2.0
+Japan             13          10         2.5         1.7
+```
+
+Monaco had **44** pit lane trips with no tyre change. Losing them made the pit
+loss measurement noticeably tighter, which means better measured.
+
+Two things fell out of Baku itself, both matching what the commentary said on
+the day:
+
+- **degradation 0.005 s/lap, the lowest of the season.** Baku is mostly straight
+  lines, so there is barely any load going through the tyre
+- **pit loss: not trusted.** Only 2 usable stops, because everyone pitted under
+  the safety car. The model says it doesnt know rather than inventing a number
 
 ## What didn't work
 
