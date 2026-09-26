@@ -723,6 +723,53 @@ halving the pace term.
 Traffic stays in because its real and it makes the what if tool more honest. But
 it is not the fix, and we know that because we measured it rather than assuming.
 
+### A second example: Sainz at Baku, where the decision was the mistake
+
+The Norris one is about a botched stop. This one is about a decision, which is
+the more interesting case.
+
+Baku needed one extra thing first. Only 2 green flag stops survived there, so
+the pit loss couldnt be measured and the tool refused to talk about the race at
+all. But pit loss barely moves between circuits, only 19.4 to 27.8 seconds
+across everywhere we can measure it. So for circuits like that we borrow the
+season typical number, say so out loud, and then check whether being 3 seconds
+out would change the answer. Here it doesnt.
+
+```
+Sainz stopped on laps 20 and 30, and had a 5 second penalty
+
+  tyres and stops    35.4s
+  traffic            +5.6s
+  penalty            +5.0s
+  total              45.6s
+
+best 1 stop, on lap 36        14.8s     worth 26.2s
+best 2 stop, laps 35 and 38   26.8s
+best 3 stop                   40.3s
+
+Pit loss check: still 1 stop even if the pit loss is 3s out either way
+```
+
+![Sainz at Baku](outputs/11_2026_Azerbaijan_SAI_whatif.png)
+
+**His early stop was the mistake, not the penalty.** Baku has the lowest
+degradation of the season (0.005 s/lap), so his tyres were barely wearing.
+Stopping on lap 20 meant paying full price for tyres he didnt need. Nine laps
+later Albon crashed, the safety car came out, and everybody else got a half
+price stop.
+
+You can see it on the chart. All three lines dive between laps 29 and 38, which
+is the safety car window. Sainz is the black dot, sitting out at lap 20 on the
+expensive part of the curve.
+
+The 5 second penalty is real, but its a fifth of the damage.
+
+**The caveat that matters:** the model knows the safety car happened and Sainz
+didnt. "Wait until lap 36" is only obvious with hindsight, so this doesnt prove
+the team got it wrong. What it does show is that the early stop was a one sided
+gamble: at a track where the tyres barely wear, stopping early has almost no
+upside and leaves you exposed if a safety car comes. Most of the field waited.
+
 ## What didn't work
 
 **We can't tell which tyre compound degrades faster.** We tried for 4 steps and

@@ -6,6 +6,7 @@ cache/
 # except the ones the README actually shows
 outputs/*.png
 !outputs/11_2026_Spanish_NOR_whatif.png
+!outputs/11_2026_Azerbaijan_SAI_whatif.png
 
 # VS Code Code Runner leaves this lying around
 tempCodeRunnerFile.py

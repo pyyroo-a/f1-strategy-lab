@@ -17,14 +17,25 @@ import pandas as pd
 def load_circuits(min_stops=8):
     """Build the one table with everything the simulator needs per circuit.
 
-    Columns: deg, pit_loss, stops, race_laps, trusted
+    Columns: deg, pit_loss, stops, race_laps, borrowed, trusted, usable
 
-    trusted is False when we dont have enough data to believe the numbers:
-      - degradation came out negative (impossible, Canada)
-      - or there werent enough green flag pit stops (China, Italy)
+    Some circuits dont have enough green flag pit stops to measure pit loss.
+    Baku is the example: everyone pitted under the safety car so only 2 real
+    stops survived, and the simulator just refused to talk about the race.
 
-    We keep the untrusted ones in the table instead of deleting them, so you can
-    still look at them on purpose, you just get warned.
+    But pit loss barely moves between circuits. Across the ones we CAN measure
+    it only spans 19.4 to 27.8 seconds, a spread of 2.6s. And the decisions we
+    make hinge on 10 to 30 second differences, so being 2s out doesnt flip an
+    answer.
+
+    So for those circuits we borrow the season typical number and mark it, the
+    same way we guessed the fuel constant and then checked it didnt matter.
+
+      trusted = everything measured properly
+      usable  = we can say something, but the pit loss might be borrowed
+
+    Canada stays out of both because its degradation is negative, which is
+    impossible, and no borrowing fixes that.
     """
     clean_air_stints = pd.read_csv("data/stints_2026_cleanair.csv")
     pit_stops = pd.read_csv("data/pit_stops_2026.csv")
@@ -37,7 +48,16 @@ def load_circuits(min_stops=8):
         "race_laps": all_stints.groupby("race")["race_laps"].max(),
     })
 
-    circuits["trusted"] = (circuits["deg"] > 0) & (circuits["stops"] >= min_stops)
+    enough = circuits["stops"] >= min_stops
+
+    # the typical stop across circuits we actually trust
+    season_pit_loss = float(circuits.loc[enough, "pit_loss"].median())
+
+    circuits["borrowed"] = ~enough
+    circuits.loc[~enough, "pit_loss"] = season_pit_loss
+
+    circuits["trusted"] = (circuits["deg"] > 0) & enough
+    circuits["usable"] = circuits["deg"] > 0
 
     return circuits
 

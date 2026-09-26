@@ -58,9 +58,18 @@ warnings.filterwarnings("ignore")
 
 # ---- settings: change these ----
 YEAR = 2026
-RACE = "Spanish"
-DRIVER = "NOR"
+RACE = "Azerbaijan"
+DRIVER = "SAI"
 MAX_STOPS = 3
+
+# any time penalty they picked up, in seconds. FastF1 doesnt give us these
+# reliably so you have to type it in. 5 and 10 second penalties are the common
+# ones, and they get added at the next stop or at the flag
+PENALTY = 5.0
+
+# if the pit loss for this circuit had to be borrowed, how far out might it be?
+# across the circuits we can measure, pit loss spans about 2.6s, so 3 covers it
+PIT_LOSS_UNCERTAINTY = 3.0
 # --------------------------------
 
 # colours, checked for colourblind readability
@@ -198,8 +207,8 @@ tyres_and_stops = time_lost_real(deg, pit_loss, total_laps, set(actual_stops),
 traffic = traffic_cost(actual_stops)
 plan_cost = tyres_and_stops + traffic
 
-# and what their stops really cost on top of that
-actual_cost = plan_cost + slow_stop_cost
+# and what their stops really cost on top of that, plus any penalty
+actual_cost = plan_cost + slow_stop_cost + PENALTY
 
 print()
 print(f"  typical stop here takes {typical_lane:.1f}s in the pit lane")
@@ -212,6 +221,8 @@ print(f"  tyres and stops        {tyres_and_stops:>7.1f}s")
 print(f"  traffic                {traffic:>+7.1f}s")
 print(f"  their plan cost        {plan_cost:>7.1f}s")
 print(f"  their stops cost       {slow_stop_cost:>+7.1f}s")
+if PENALTY:
+    print(f"  time penalty           {PENALTY:>+7.1f}s")
 print(f"  total                  {actual_cost:>7.1f}s")
 print()
 
@@ -248,6 +259,7 @@ for stops in range(1, MAX_STOPS + 1):
           f"{gain:+.1f}s vs what they did")
 
 best_cost, best_plan = min(best_per_stops.values())
+overall_stops = min(best_per_stops, key=lambda s: best_per_stops[s][0])
 plan_gain = plan_cost - best_cost
 
 print()
@@ -268,6 +280,34 @@ else:
 
 # everything they could have had: a better plan AND a normal stop
 gain = plan_gain + max(slow_stop_cost, 0.0)
+
+
+# ---------------------------------------------------------------------------
+# would the answer survive being wrong about the pit loss?
+# ---------------------------------------------------------------------------
+# a borrowed pit loss could be a couple of seconds out. that only matters if it
+# would change which strategy wins, so we just try it and see
+
+def best_stop_count(alt_pit_loss):
+    best = None
+    for stops, (_, plan) in best_per_stops.items():
+        c = (time_lost_real(deg, alt_pit_loss, total_laps, set(plan),
+                            sc_laps, red_laps) + traffic_cost(plan))
+        if best is None or c < best[0]:
+            best = (c, stops)
+    return best[1]
+
+low = best_stop_count(pit_loss - PIT_LOSS_UNCERTAINTY)
+high = best_stop_count(pit_loss + PIT_LOSS_UNCERTAINTY)
+
+print()
+if low == high == overall_stops:
+    print(f"Pit loss check: still {overall_stops} stops even if the pit loss is "
+          f"{PIT_LOSS_UNCERTAINTY:.0f}s out either way. The answer holds.")
+else:
+    print(f"CAREFUL: the answer depends on the pit loss. "
+          f"{PIT_LOSS_UNCERTAINTY:.0f}s cheaper says {low} stops, "
+          f"{PIT_LOSS_UNCERTAINTY:.0f}s dearer says {high} stops.")
 
 
 # ---------------------------------------------------------------------------

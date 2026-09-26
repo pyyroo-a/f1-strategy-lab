@@ -171,9 +171,9 @@ print(f"{RACE}: {race_laps} laps, deg {deg:.3f} s/lap, pit loss {pit_loss:.1f}s"
 
 # some circuits dont have enough data to believe. we still let you run them,
 # you just get told not to trust the answer
-if not row["trusted"]:
-    print(f"WARNING: only {int(row['stops'])} green flag stops here, "
-          f"so the pit loss is a guess. Dont trust the numbers below.")
+if row["borrowed"]:
+    print(f"NOTE: only {int(row['stops'])} green flag stops here, so the pit "
+          f"loss is borrowed from the season typical ({pit_loss:.1f}s)")
 
 scenarios = make_scenarios(race_laps)
 print(f"{len(scenarios)} simulated races, same ones used for every strategy\n")
