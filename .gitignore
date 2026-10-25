@@ -7,6 +7,7 @@ cache/
 outputs/*.png
 !outputs/11_2026_Spanish_NOR_whatif.png
 !outputs/11_2026_Azerbaijan_SAI_whatif.png
+!outputs/13_track_temp_between.png
 
 # VS Code Code Runner leaves this lying around
 tempCodeRunnerFile.py

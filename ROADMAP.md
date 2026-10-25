@@ -107,15 +107,23 @@ The order matters. Doing onboard first means proving the measurement works while
 only having one hard problem to deal with. Going straight at broadcast footage
 means two hard problems at once and no way of knowing which one broke.
 
-### Why 2026 forces this shape
+### Why gaps and not speed
 
-Telemetry does not load for 2026. No speed traces, no positions. So the obvious
-CV project, estimating speed from video with telemetry as the answer key, cannot
-be checked against 2026 data.
+Telemetry does not load for 2026 **in this project**, and I need to be accurate
+about why, because I had this wrong for a while.
 
-Gaps can, because gaps come from lap times and those are fine. That is a real
-constraint we found rather than guessed, and it is what points the CV work at
-traffic rather than speed.
+It is a **version** problem, not a data problem. This repo runs fastf1 3.5.3,
+where loading 2026 car data crashes. The driver lines project runs 3.8.3, which
+loads it fine, and thats where I drew Antonelli's Monza lap. Upgrading this repo
+would break the rest of it, so it stays where it is.
+
+So estimating speed from video **can** be checked against 2026 telemetry, just
+not from here. It would live in driver lines.
+
+Gaps are still the better target for this side of the work, but for a different
+reason than I first thought: gaps are what this project already measures to the
+hundredth of a second, so this project is the answer key. Thats the whole point
+of the pairing.
 
 ### Boundary with the other project
 
@@ -127,6 +135,19 @@ folder here. The two projects share the idea that one measures the truth and the
 other tries to see it, and that is all they should share.
 
 ---
+
+## The data situation, as of October 2026
+
+Fastf1 cannot download anything new. F1 put live timing behind an F1TV login,
+and fastf1 fails quietly rather than raising, which is worse.
+
+The project is fine. All 15 races are cached and every number is saved in
+`data/`. Step 14 only needs sector times and speed traps from the lap tables we
+already have. Whats blocked is new races and any session we never downloaded,
+which is what parked the practice session experiment.
+
+PitWall moved to OpenF1 for this reason. This project has not, and does not need
+to unless we want a session we dont already hold.
 
 ## Open questions
 

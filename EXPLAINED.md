@@ -282,6 +282,87 @@ to the tenth.
 Perfect plan, lost in the pit box. Which is the same conclusion anyone watching
 the race would reach.
 
+### How sure am I about any of this?
+
+My professor asked me that, and it was the best question anyone has asked about
+the project.
+
+Every circuit's number is the **middle** of a pile of stints. So I went and
+looked at how much the pile disagrees with itself.
+
+The test is simple. If a stint comes out saying the tyres got **faster** as they
+got older, that stint is nonsense, because tyres dont do that. So just count the
+nonsense ones.
+
+**At Barcelona, 2 stints out of 45 are nonsense.** At Japan, zero out of 27.
+Those numbers are real.
+
+**At Azerbaijan, 43% of them are nonsense.** At Monaco a third. Those arent
+gentle circuits at all, theyre circuits where I never managed to measure
+anything, and the middle of a pile of noise happened to land just above zero.
+
+So the top half of my table is a measurement and the bottom half isnt. Thats
+worth more to know than the table was before.
+
+### 13. Does the weather explain it?
+
+My professor also asked **"what if the same circuit degrades differently at
+different times"**, and he had a point. Barcelona might not be harsh. Barcelona
+might just have been hot that day.
+
+The weather data is there, including how hot the track surface was, so I checked.
+
+**First test, inside one race.** This is the good one. During a race the track,
+the corners and the car never change, so if the tyres wear faster when its
+hotter, it has to be the heat. Nothing else moved.
+
+Answer: **nothing.** The effect was less than half the size of the random
+wobble, across 506 stints.
+
+**Second test, comparing circuits.** More temperature range here, 18 degrees in
+Canada up to 54 in Madrid. On all 15 circuits, nothing again.
+
+But then I remembered six of those circuits arent real measurements. So I threw
+them out and tried the nine good ones. **And this time something showed up.**
+
+Hotter circuits really did wear tyres faster.
+
+**Then I tried to break it, because I picked those nine after looking at the
+data, and thats exactly how people fool themselves.** I pulled out one circuit
+at a time and re-checked. It survived eight of the nine. Pull out China and the
+whole thing collapses.
+
+So the result rests on a single data point. Thats not a finding, thats a
+coincidence with good manners.
+
+**And then the one that settled it.** If the tyre actually cared about
+temperature, then heating the track up a few degrees *during* a race should do
+something as well. I ran that on the same nine circuits.
+
+Dead flat. Not weak. Zero.
+
+**So: the weather does not explain why circuits differ.** The hot circuits in my
+list are Barcelona, Hungary and Austria, and those are punishing tracks anyway.
+The temperature was just along for the ride.
+
+**But I cant say the weather doesnt matter, and this is the important bit.** The
+track only moves about 3 degrees during a race, and 2026 ran one race per
+circuit, so every track has exactly one temperature attached to it forever. I
+didnt fail to find an effect. I had no way to look for one.
+
+The proper experiment is practice sessions. Same car, same track, same weekend,
+but 10 or 15 degrees apart because theyre at different times of day. That is
+exactly what he was asking about. I cant run it, because F1 put the data behind
+a login and I never downloaded those sessions.
+
+**One thing I nearly got wrong.** The first version of my output said 10 degrees
+of track temp was worth 30% of the difference between the harshest and gentlest
+circuit. That sounded massive. But a race only ever swings 3 degrees, so I was
+quoting a number from four times outside my own data. The honest figure is 8%.
+
+Never quote an effect over a range you never had. Thats a comment in the code
+now so I dont do it again.
+
 ---
 
 ## What it can and cannot do
@@ -298,11 +379,14 @@ the race would reach.
 
 - telling you which tyre compound wears faster (the noise is 10x the signal)
 - predicting a gap in seconds reliably (the pace estimate is roughly double)
+- measuring degradation at the gentle circuits, where it doesnt really measure
+  anything at all
 
 **Still broken:**
 
 - Canada shows tyres getting faster with age, which is impossible, and we still
-  do not know why
+  do not know why. Two clues now: 69% of its stints are negative so its
+  systematic, and its the coldest race of the season by a clear margin
 
 ---
 

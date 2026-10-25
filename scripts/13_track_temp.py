@@ -219,17 +219,46 @@ print(circuits.sort_values("track_temp").to_string(
 
 r2 = circuits["track_temp"].corr(circuits["deg"])
 floor2 = 1.96 / np.sqrt(len(circuits))
-print(f"\ncorrelation across {len(circuits)} circuits: {r2:+.3f}")
+print(f"\ncorrelation across all {len(circuits)} circuits: {r2:+.3f}")
 print(f"noise floor for {len(circuits)} points is {floor2:.3f}", end="  ")
 print("<- real" if abs(r2) > floor2 else "<- under it, so this is nothing")
 
-# Barcelona and Madrid are the pair everyone reaches for, nearly the same
-# temperature and nothing like the same degradation. Careful though, Madrid is
-# the worst measured circuit of the season, a third of its stints come out
-# negative. Monza is the better comparison, its sampled properly.
-pair = circuits[circuits.index.isin(["Barcelona", "Spanish", "Italian"])]
-print("\nBarcelona vs Madrid vs Monza:")
-print(pair.to_string(float_format=lambda x: f"{x:.3f}"))
+
+# ---------------------------------------------------------------------------
+# Test 2 again, this time only on circuits we actually measured
+# ---------------------------------------------------------------------------
+
+# Six of the 15 circuits have so many impossible stints that their degradation
+# number is whatever the noise averaged out to, see degradation_confidence.py.
+# Leaving them in buries any real signal, so run it again without them.
+share_negative = d.groupby("race")["deg_per_lap"].apply(lambda x: (x < 0).mean())
+trusted = circuits[share_negative[circuits.index] < 0.25]
+
+r3 = trusted["track_temp"].corr(trusted["deg"])
+floor3 = 1.96 / np.sqrt(len(trusted))
+print(f"\nsame thing on the {len(trusted)} trusted circuits only: {r3:+.3f}")
+print(f"noise floor for {len(trusted)} points is {floor3:.3f}", end="  ")
+print("<- real" if abs(r3) > floor3 else "<- under it, so this is nothing")
+
+# Dont get excited yet. I picked that subset after seeing the data, which is
+# exactly how people fool themselves, so check whether it survives poking.
+print("\nhow fragile is that? drop one circuit at a time:")
+for race in trusted.index:
+    left = trusted.drop(race)
+    rr = left["track_temp"].corr(left["deg"])
+    ff = 1.96 / np.sqrt(len(left))
+    verdict = "still real" if abs(rr) > ff else "GONE"
+    print(f"  without {race:<11} {rr:+.3f} vs floor {ff:.3f}  {verdict}")
+
+# And the one that settles it. If the tyre really cared about temperature then
+# moving the track a few degrees inside a race should do something too. Run
+# the within race test on these same circuits and see.
+dt = d[d["race"].isin(trusted.index)]
+r4 = dt["track_temp_c"].corr(dt["deg_per_lap_c"])
+floor4 = 1.96 / np.sqrt(len(dt))
+print(f"\nbut within a race on those same circuits: {r4:+.3f} on {len(dt)} stints")
+print(f"noise floor {floor4:.3f}", end="  ")
+print("<- real" if abs(r4) > floor4 else "<- flat. nothing at all")
 
 
 # ---------------------------------------------------------------------------
@@ -278,8 +307,9 @@ fig.patch.set_facecolor(SURFACE)
 tidy(ax)
 
 for race, row in circuits.iterrows():
-    # orange for the three that make the point
-    pick = race in ("Barcelona", "Spanish", "Italian")
+    # orange for the circuits we never really measured, so the chart shows
+    # which dots to ignore rather than quietly treating all 15 as equal
+    pick = race not in trusted.index
     ax.scatter(row["track_temp"], row["deg"],
                s=110 if pick else 70,
                color=WARN if pick else ACCENT,
@@ -292,10 +322,11 @@ for race, row in circuits.iterrows():
 
 ax.set_xlabel("median track temp on race day (degrees)", color=INK_SOFT)
 ax.set_ylabel("degradation (s/lap of tyre age)", color=INK_SOFT)
-ax.set_title(f"Across circuits: correlation {r2:+.2f}, on only 15 points",
+ax.set_title(f"Across circuits: {r2:+.2f} on all 15, {r3:+.2f} on the "
+             f"{len(trusted)} we trust",
              color=INK, fontsize=13, fontweight="bold", loc="left")
-fig.text(0.01, 0.01, "Barcelona, Madrid and Monza in orange: all hot, "
-                     "nothing like the same degradation",
+fig.text(0.01, 0.01, "orange means the circuit has too many impossible stints "
+                     "to be a real measurement",
          fontsize=9, color=INK_SOFT)
 
 plt.tight_layout(rect=[0, 0.03, 1, 1])

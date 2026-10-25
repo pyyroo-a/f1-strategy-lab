@@ -87,6 +87,52 @@ The cool thing is we never told the code anything about the tracks, only lap
 times. It worked out by itself that Barcelona is the harshest, Monaco is gentle
 and Monza is the gentlest, which is exactly what anyone in F1 would tell you.
 
+### How much to trust those numbers
+
+My professor's first question was "how sure are you about these values", and for
+a while I didnt have a good answer. The table above is a **median** across every
+stint at a circuit, and a median says nothing about whether the drivers agreed.
+
+So heres the agreement next to the number. A stint coming out **negative** means
+that stint measured tyres getting faster with age, which is impossible, so its a
+direct count of how much noise we failed to remove.
+
+| Circuit | Degradation | Stints | Middle half of stints | Came out negative |
+| --- | --- | --- | --- | --- |
+| Barcelona | 0.139 | 45 | 0.124 to 0.194 | 2% |
+| Hungary | 0.088 | 53 | 0.054 to 0.119 | 2% |
+| Austria | 0.081 | 48 | 0.065 to 0.102 | 4% |
+| Japan | 0.064 | 27 | 0.041 to 0.081 | **0%** |
+| Netherlands | 0.063 | 48 | 0.033 to 0.095 | 8% |
+| Britain | 0.059 | 36 | 0.041 to 0.084 | 6% |
+| Belgium | 0.054 | 22 | 0.035 to 0.072 | 5% |
+| China | 0.027 | 23 | 0.015 to 0.048 | 13% |
+| Miami | 0.022 | 29 | 0.000 to 0.034 | 24% |
+| Australia | 0.047 | 29 | -0.002 to 0.064 | 28% |
+| Monaco | 0.024 | 31 | -0.013 to 0.047 | 32% |
+| Italy | 0.013 | 22 | -0.008 to 0.023 | 27% |
+| Spain | 0.011 | 36 | -0.007 to 0.114 | 36% |
+| Azerbaijan | 0.005 | 21 | -0.007 to 0.030 | 43% |
+| Canada | -0.017 | 36 | -0.048 to 0.005 | **69%** |
+
+**The top of the table is solid and the bottom of it isnt measured at all.**
+
+At Barcelona 45 stints and 44 of them agree the track is harsh. At Japan every
+single stint came out positive. Those numbers are real.
+
+At Azerbaijan 43% of stints say the tyres got faster. At Monaco a third do.
+Those arent gentle circuits, theyre circuits where we **failed to measure
+anything** and the median happened to land just above zero.
+
+So: comparing Barcelona against China is fair, both are measured properly.
+Comparing Monza against Monaco is not, theyre both noise.
+
+**Madrid is the one to watch.** Its middle half spans 0.122, the widest of the
+season, off 36 stints that disagree wildly. Its tempting to put next to
+Barcelona because the medians look dramatic, but it would be a weak argument.
+
+Run it yourself with `python scripts/degradation_confidence.py`.
+
 ### Pit loss per circuit
 
 | Circuit | Pit loss (s) | Spread | Stops used |
@@ -654,7 +700,7 @@ pass* with *didnt try*. At Baku, Hadjar sat behind Verstappen for most of the
 race on purpose, as a team thing to make sure Max got the win. That counts as
 stuck in here. So these numbers overstate the difficulty a bit everywhere.
 
-### Step 13: putting traffic in the model, and finding out it wasnt the problem
+### Step 12b: putting traffic in the model, and finding out it wasnt the problem
 
 We then spent that number. When a stop drops you behind someone, charge the
 dirty air cost from step 6 for as many laps as step 12 says you stay stuck.
@@ -774,6 +820,116 @@ the team got it wrong. What it does show is that the early stop was a one sided
 gamble: at a track where the tyres barely wear, stopping early has almost no
 upside and leaves you exposed if a safety car comes. Most of the field waited.
 
+### Step 13: does track temperature explain degradation?
+
+I described this project to my CV professor and he asked **"what if the same
+circuit degrades differently at different times"**. Fair, and it bothered me,
+because our per circuit numbers could partly be that day's weather rather than
+anything about the track.
+
+Weather data does load from fastf1, including TrackTemp, so this was testable.
+
+**Getting a temperature onto every stint.** Weather readings and lap times are
+both stamped with a session time, so theyre on the same clock. For each of the
+506 stints we take the median track temp over the laps it actually ran. All 506
+matched, and the track came out hotter than the air 100% of the time, which is
+the sanity check that the join lined up.
+
+**Written down before measuring:** hotter track should mean more degradation.
+
+#### Test 1: inside a single race
+
+The good test. During a race the circuit, the surface and the car never change,
+so if hot stints wear faster than cool ones its the temperature doing it.
+
+The trick is to take each race's own median off every column. A row then stops
+saying "Barcelona, 50 degrees, 0.139" and starts saying "2 degrees hotter than
+normal for its race, 0.01 more degradation than normal for its race". The
+circuit has cancelled itself out, so all 15 races go in one pile.
+
+```
++0.00408 s/lap per degree
+correlation +0.048, and the noise floor for 506 points is 0.087
+```
+
+Points the right way, but its **half the noise floor**, so with 506 stints that
+slope is indistinguishable from zero.
+
+And it couldnt have been trusted anyway. Track temp drops through an afternoon
+and later stints are also later in the race, and those two move together at
+**-0.56**. So even a real result couldnt have been pinned on the temperature.
+
+#### Test 2: across circuits
+
+Loads of range here, 18 degrees at Canada up to 54 at Madrid. But 15 points.
+
+```
+all 15 circuits:      +0.319, noise floor 0.506   nothing
+the 9 we trust:       +0.721, noise floor 0.653   real
+```
+
+The first number is nothing. But six of the 15 circuits arent real measurements
+(see **How much to trust those numbers** above), and leaving them in buries
+anything thats there. Drop them and it clears the floor.
+
+**So I poked it, because I picked that subset after seeing the data and thats
+exactly how people fool themselves.**
+
+```
+drop one circuit at a time from the 9:
+  survives 8 of 9
+  dies without China  (+0.648 vs floor 0.693)
+```
+
+![track temp against degradation](outputs/13_track_temp_between.png)
+
+Orange dots are the circuits with too many impossible stints to be real
+measurements. Note how much of the picture they were filling.
+
+The whole thing **hangs on China**, the coldest circuit and the only well
+measured one at the low end. Pull it out and the result goes.
+
+#### The thing that settles it
+
+If the tyre genuinely cared about temperature, then moving the track a few
+degrees **inside** a race should do something too. So I ran test 1 again on
+those same 9 trusted circuits:
+
+```
+-0.006 across 331 stints, noise floor 0.108
+```
+
+Dead flat. Not weak, not borderline. Nothing.
+
+#### What it means
+
+**Track temperature does not explain the per circuit degradation table.**
+
+The across circuit hint is more likely temperature standing in for something
+else about hot circuits than temperature itself, because the hot ones here are
+Barcelona, Hungary and Austria and theyre all high load tracks anyway. If the
+tyre cared about the thermometer, the within race test would show it, and it
+shows nothing at all.
+
+**But I cant say temperature has no effect, and thats the half that matters.**
+The track only swings about 2.8 degrees during a race, and 2026 has one race per
+circuit so every track has exactly one temperature attached to it forever. We
+didnt fail to find an effect. We had no way to see one.
+
+**The real experiment is the practice sessions.** FP1, FP2 and FP3 are the same
+car on the same track on the same weekend, 10 or 15 degrees apart. That is
+literally "the same circuit at different times". It needs sessions we never
+downloaded and fastf1 cant fetch any more, so its parked, not abandoned.
+
+#### A trap I nearly printed
+
+The first version of the output said 10 degrees of track temp is worth 30% of
+the spread between the harshest and gentlest circuit. Sounded big.
+
+But races only swing 2.8 degrees, so that was extrapolating four times past the
+data. The honest figure is 8%. Its a comment in the script now: **dont quote an
+effect over a range you never had.**
+
 ## What didn't work
 
 **We can't tell which tyre compound degrades faster.** We tried for 4 steps and
@@ -802,7 +958,14 @@ but Miami moved more (0.009 to 0.022). Too small to call either way.
 
 ## Known problems
 
-- **Canada still has negative degradation**, which is impossible. Don't know why yet
+- **Canada still has negative degradation**, which is impossible. Two facts now
+  point at it and neither explains it: **69% of its 36 stints are individually
+  negative**, so its systematic rather than a median landing somewhere odd, and
+  its the **coldest race of the season** at 18.6 degrees, over 2 colder than
+  anything else. Not enough to blame the cold, but its the first lead we've had
+- **Six of the 15 circuits arent really measured.** Australia, Monaco, Italy,
+  Spain, Azerbaijan and Canada all have more than a quarter of their stints
+  coming out negative. Their numbers are whatever the noise averaged out to
 - **Degradation is a straight line.** Real tyres sometimes hit a "cliff" where
   they're fine and then suddenly fall apart
 - **The simulator has no safety cars**, so it always plans a clean race
@@ -815,11 +978,38 @@ but Miami moved more (0.009 to 0.022). Too small to call either way.
 
 ## What's next
 
-**Fix the pace estimate.** Step 13 showed this is the real weak spot, not
-traffic. Ideas:
-- measure pace from laps where BOTH teammates were in clean air at the same
-  time, so the sample is fair
-- or drop the pace term and only ever compare strategies for the same driver
+**Step 14: circuit shape.** Temperature was the obvious explanation for why
+circuits differ and it didnt hold up, so whatever drives the difference is
+about the track itself. Tyres wear two different ways: fast corners load the
+tyre sideways and scrub it, hard braking and acceleration dumps heat into it.
+Those should leave different fingerprints.
+
+The main test is **degradation per sector**. Every lap has Sector1Time,
+Sector2Time and Sector3Time, so run the same fit on each sector separately and
+ask which part of the lap loses the time as the tyre ages. If Barcelona's loss
+sits in the sector with the long fast corners thats direct evidence. If its
+spread evenly the idea is wrong. Either answer is useful.
+
+Supporting test is the four speed traps (SpeedI1, SpeedI2, SpeedFL, SpeedST).
+Two features only, stated before measuring: fast corners mean the slow parts of
+the lap are still fast, braking zones mean a big spread between traps. Baseline
+to beat is top speed on its own.
+
+**No model.** 15 circuits is 15 data points, so anything with more than two or
+three inputs fits noise and proves nothing.
+
+**Step 15: make the website interactive.** Drag the pit laps, watch the cost
+move, plus a ghost line showing where the driver would have been lap by lap.
+All arithmetic we already do, no backend needed.
+
+**Fix the pace estimate.** Step 12b showed this is the real weak spot, not
+traffic. Either measure pace from laps where BOTH teammates were in clean air at
+the same time, or drop the pace term and only compare strategies for the same
+driver.
+
+**Parked, because the data is gone:**
+- the practice session temperature experiment, the proper answer to the
+  professor's question. Needs sessions we never cached
 
 **Later ideas:**
 - add VSC as well as full safety cars
@@ -845,6 +1035,8 @@ Run them in order, each one saves what the next one needs.
 | `scripts/10_validation.py` | Checks the model against real teammate battles |
 | `scripts/11_what_if.py` | What could a driver have done instead, with charts |
 | `scripts/12_overtaking.py` | Measures how hard each track is to overtake at |
+| `scripts/13_track_temp.py` | Track temperature per stint, and whether it explains anything |
+| `scripts/degradation_confidence.py` | How much the drivers agree at each circuit |
 | `scripts/build_website.py` | Runs the analysis for every driver and builds the website |
 | `scripts/strategy.py` | Shared bits used by more than one script |
 
@@ -879,6 +1071,17 @@ python scripts/08_simulator.py
 
 When a new race happens just re-run 04, 06, 07 and 08. They pick up new races
 by themselves.
+
+## A note on the data
+
+**Fastf1 cant download anything new since October 2026.** F1 put live timing
+behind an F1TV login. It doesnt raise an error either, it logs "Failed to load
+timing data" and carries on, and then `.laps` throws `DataNotLoadedError`.
+
+This project still runs fine because all 15 races are in `cache/` and every
+number is saved in `data/`. Step 14 only needs sector times and speed traps,
+which come with the cached lap tables. Whats blocked is new races and any
+session type we never downloaded, like practice.
 
 ## Setup
 
